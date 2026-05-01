@@ -2,110 +2,173 @@ package com.bouncingball.angryball;
 
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
 import javafx.util.Duration;
-
+import java.util.ArrayList;
 
 public class BouncingBall extends Circle {
+    public static final double MAX_SPEED = 1000;
     public static final double COLLISION_FACTOR = 0.7;
     public static final double GRAVITY = 0.5;
     private static final double X_FRICTION_FORCE = 0.05;
     private static final double Y_FRICTION_FORCE = 0.05;
     private double mass = 1;
-    private double dy = -10;
-    private double dx = 10;
-    private double boundX;
-    private double boundY;
-//    private double heightFromGround;
+    private double vY = -10;
+    private double vX = 10;
+    private ArrayList<Pane> boundingPanes;
+    private ArrayList<Line> linesObserved;
+    private ArrayList<BouncingBall> ballsObserved;
+    private double nextX;
+    private double nextY;
 
 
-    public BouncingBall(double radius, double boundX,double boundY){
-        this.setRadius(radius);
-        this.boundX = boundX;
-        this.boundY = boundY - 30;
-        // playing animation
-        animation.setCycleCount(Timeline.INDEFINITE);
-        this.animation.play();
+    //    Timeline animation = new Timeline(
+//            new KeyFrame(Duration.millis(50), e -> {
+    public void update(){
+        // max speed
+        if (vX > MAX_SPEED){
+            vX = MAX_SPEED;
+        }
+        if (vY > MAX_SPEED){
+            vY = MAX_SPEED;
+        }
+        // remove small velocity
+        if (Math.abs(vX) < 0.01) vX = 0;
+        if (Math.abs(vY) < 0.01) vY = 0;
+        // next Points
+        nextX = this.getCenterX() + vX; // predicted new position
+        nextY = this.getCenterY() + vY; // predicted new position
+
+        // ******* checking Pane Boundries Collision *********
+        for(Pane pane : boundingPanes){
+            double boundX = pane.getWidth();
+            double boundY = pane.getHeight();
+            double paneXOrigin = pane.localToScene(0, 0).getX();
+            double paneYOrigin = pane.localToScene(0, 0).getY();
+
+            boolean xBounceCondition1 = nextX - getRadius() <= paneXOrigin;
+            boolean xBounceCondition2 = nextX + getRadius() >= boundX;
+
+            if(xBounceCondition1 || xBounceCondition2){
+                vX *= -1 * COLLISION_FACTOR ;
+                if(xBounceCondition1){
+                    nextX = paneXOrigin + getRadius();
+                } else if(xBounceCondition2){
+                    nextX = boundX - getRadius();
+                }
+
+            }
+
+            boolean yBounceCondition1 = nextY - getRadius() <= paneYOrigin;
+            boolean yBounceCondition2 = nextY + getRadius() >= boundY;
+
+            if(yBounceCondition1 || yBounceCondition2) {
+                vY *= -1 * COLLISION_FACTOR;
+                if(yBounceCondition1){
+                    nextY = paneYOrigin + getRadius();
+                } else if(yBounceCondition2){
+                    nextY = boundY - getRadius();
+                    if (Math.abs(vY) < 1) {
+                        vY = 0;
+                    }
+                }
+
+            }
+        }
+
+        // ************ Checking Collision for Lines *********
+        for(Line line : this.linesObserved){
+
+        }
+
+        // ************ Checking Collision for observed Balls *********
+        for (BouncingBall ball : this.ballsObserved) {
+            double dx = ball.getCenterX() - this.getCenterX(); // Delta X between two balls centers
+            double dy = ball.nextY - this.nextY; // Delta Y between two balls centers
+            double dist = Math.sqrt(dx * dx + dy * dy); // abs distance between two balls
+            double minDist = this.getRadius() + ball.getRadius(); // minimum allowed distance
+
+            if (dist < minDist && dist > 0) {
+
+                // unit vectors for vector from ball 2 to ball 1 centers
+                double nx = dx / dist; // cos theta
+                double ny = dy / dist; // sin theta
+
+                // overlapping prevention
+                double overlap = (minDist - dist) / 2.0;
+                this.nextX -= overlap * nx;
+                this.nextY -= overlap * ny;
+
+                // get velocities in the normal axis of collision
+                double vA_n = this.vX * nx + this.vY * ny;
+                double vB_n = ball.getvX() * nx + ball.getvY() * ny;
+
+
+                // Only apply if the balls are going to collide // Only resolve if balls are actually approaching (not already separating)
+                if (vA_n - vB_n > 0) {
+
+                    double mA = this.mass;
+                    double mB = ball.getMass();
+                    double e = COLLISION_FACTOR; // coefficient of restitution
+
+                    // Applying collision formulas
+                    double totalMass = mA + mB;
+                    double newVA_n = ((mA - e * mB) * vA_n + (1 + e) * mB * vB_n) / totalMass;
+                    double newVB_n = ((mB - e * mA) * vB_n + (1 + e) * mA * vA_n) / totalMass;
+
+                    double dVA_n = newVA_n - vA_n; // normal speed difference
+                    double dVB_n = newVB_n - vB_n; // normal speed difference
+
+                    // apply on X and Y velocities
+                    this.vX  += dVA_n * nx;
+                    this.vY  += dVA_n * ny;
+
+                    // Apply velocity change to the other ball (necessary for sync) // may double effect
+                    ball.setvX(ball.getvX() + dVB_n * nx);
+                    ball.setvY(ball.getvY() + dVB_n * ny);
+                }
+            }
+        }
+
+        // Gravity and friction
+        if (vY > 0){
+            vY += (mass * GRAVITY - Y_FRICTION_FORCE);
+        } else if (vY < 0) {
+            vY += (mass * GRAVITY + Y_FRICTION_FORCE);
+        } else if(vY == 0){
+            vY += mass * GRAVITY;
+        }
+
+        if (vX > 0){
+            vX += (-X_FRICTION_FORCE);
+        } else if (vX < 0) {
+            vX += (X_FRICTION_FORCE);
+        } // else if(dx == 0){}
+
+
+        this.setCenterX(nextX);
+        this.setCenterY(nextY);
     }
-
-    Timeline animation = new Timeline(
-            new KeyFrame(Duration.millis(50), e -> {
-//                dy +=(dy > 0) ? (mass * GRAVITY - Y_FRICTION_FORCE) : (mass * GRAVITY + Y_FRICTION_FORCE);
-//                dx = (dx > 0) ? dx - X_FRICTION_FORCE : dx + X_FRICTION_FORCE;
-                // Gravity and friction
-                if (dy > 0){
-                    dy += (mass * GRAVITY - Y_FRICTION_FORCE);
-                } else if (dy < 0) {
-                    dy += (mass * GRAVITY + Y_FRICTION_FORCE);
-                } else if(dy == 0){
-                    dy += mass * GRAVITY;
-                }
-
-                if (dx > 0){
-                    dx += (-X_FRICTION_FORCE);
-                } else if (dx < 0) {
-                    dx += (X_FRICTION_FORCE);
-                } // else if(dx == 0){}
-
-
-                double nextX = this.getCenterX() + dx; // predicted new position
-                boolean xBounceCondition1 = nextX - getRadius() <= 0;
-                boolean xBounceCondition2 = nextX + getRadius() >= boundX;
-
-                if(xBounceCondition1 || xBounceCondition2){
-                    dx *= -1 * COLLISION_FACTOR ;
-                    if(xBounceCondition1){
-//                        this.setCenterX(0 + getRadius());
-                        nextX = 0 + getRadius();
-                    } else if(xBounceCondition2){
-//                        this.setCenterX(boundX - getRadius());
-                        nextX = boundX - getRadius();
-                    }
-
-                }
-
-                double nextY = this.getCenterY() + dy; // predicted new position
-                boolean yBounceCondition1 = nextY - getRadius() <= 0;
-                boolean yBounceCondition2 = nextY + getRadius() >= boundY;
-
-                if(yBounceCondition1 || yBounceCondition2) {
-                    dy *= -1 * COLLISION_FACTOR;
-                    if(yBounceCondition1){
-//                        this.setCenterY(0 + getRadius());
-                        nextY = 0 + getRadius();
-                    } else if(yBounceCondition2){
-//                        this.setCenterY(boundY - getRadius());
-                        nextY = boundY - getRadius();
-                        if (Math.abs(dy) < 1) {
-                            dy = 0;
-                        }
-                    }
-
-                }
-//                this.setCenterX(this.getCenterX() + dx);
-//                this.setCenterY(this.getCenterY() + dy);
-                this.setCenterX(nextX);
-                this.setCenterY(nextY);
-//                System.out.println(dy);
-            }));
 
 
     // Getters and Setters
-    public double getDy() {
-        return dy;
+    public double getvY() {
+        return vY;
     }
 
-    public void setDy(double dy) {
-        this.dy = dy;
+    public void setvY(double vY) {
+        this.vY = vY;
     }
 
-    public double getDx() {
-        return dx;
+    public double getvX() {
+        return vX;
     }
 
-    public void setDx(double dx) {
-        this.dx = dx;
+    public void setvX(double vX) {
+        this.vX = vX;
     }
 
     public void setMass(double mass){
@@ -115,36 +178,45 @@ public class BouncingBall extends Circle {
         return this.mass;
     }
 
+    public void addBall(BouncingBall ball){
+        this.ballsObserved.add(ball);
+    }
+
 
     // Using an inner Class Builder
     private BouncingBall(Builder builder) { // private Constructor
         this.setRadius(builder.radius);
-        this.boundX = builder.boundX;
-        this.boundY = builder.boundY;
-
-        this.dx = builder.dx;
-        this.dy = builder.dy;
+        this.vX = builder.vX;
+        this.vY = builder.vY;
         this.mass = builder.mass;
         this.setFill(builder.color);
+        this.boundingPanes = builder.boundingPanes;
+        this.linesObserved = builder.linesObserved;
+        this.ballsObserved = builder.ballsObserved;
+        this.setCenterX(builder.centerX);
+        this.setCenterY(builder.centerY);
 
-        this.setOnDragDetected(e -> {this.dx += 10;});
+        this.setOnDragDetected(e -> {this.vX += 10;});
 
-        animation.setCycleCount(Timeline.INDEFINITE);
-        animation.play();
+//        animation.setCycleCount(Timeline.INDEFINITE);
+//        animation.play();
     }
 
     public static class Builder { // inner builder class
         private double radius = 20;
-        private double boundX;
-        private double boundY;
-        private double dx = 5;
-        private double dy = 0;
+        private double vX = 5;
+        private double vY = 0;
         private double mass = 1;
         private Color color = Color.RED;
+        private final ArrayList<Pane> boundingPanes = new ArrayList<>();
+        private final ArrayList<Line> linesObserved = new ArrayList<>();
+        private final ArrayList<BouncingBall> ballsObserved = new ArrayList<>();
+        private double centerX;
+        private double centerY;
 
-        public Builder bounds(double x, double y) {
-            this.boundX = x;
-            this.boundY = y;
+        public Builder center(double x, double y){
+            this.centerX = x;
+            this.centerY = y;
             return this;
         }
 
@@ -153,9 +225,9 @@ public class BouncingBall extends Circle {
             return this;
         }
 
-        public Builder velocity(double dx, double dy) {
-            this.dx = dx;
-            this.dy = dy;
+        public Builder velocity(double vX, double vY) {
+            this.vX = vX;
+            this.vY = vY;
             return this;
         }
 
@@ -169,16 +241,42 @@ public class BouncingBall extends Circle {
             return this;
         }
 
+
+        public Builder addPanes(ArrayList<Pane> panes){
+            this.boundingPanes.addAll(panes);
+            return this;
+        }
+
+
+        public Builder addPane(Pane pane){
+            this.boundingPanes.add(pane);
+            return this;
+        }
+
+        public Builder addLines(ArrayList<Line> lines){
+            this.linesObserved.addAll(lines);
+            return this;
+        }
+
+        public Builder addLine(Line line){
+            this.linesObserved.add(line);
+            return this;
+        }
+
+        public Builder addBalls(ArrayList<BouncingBall> balls){
+            this.ballsObserved.addAll(balls);
+            return this;
+        }
+
+        public Builder addBall(BouncingBall ball){
+            this.ballsObserved.add(ball);
+            return this;
+        }
+
+
         public BouncingBall build() {
             return new BouncingBall(this); // use the private Constructor
         }
     }
+
 }
-
-//    private static final double COLLISION_FACTOR = 0.5;
-//    private static final double COLLISION_FACTOR = 1;
-
-//Class BallBuilder {
-//}
-
-

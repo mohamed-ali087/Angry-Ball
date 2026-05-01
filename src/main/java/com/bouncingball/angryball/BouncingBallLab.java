@@ -1,15 +1,16 @@
 package com.bouncingball.angryball;
-
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.layout.Border;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 public class BouncingBallLab extends Application {
     @Override
@@ -22,8 +23,8 @@ public class BouncingBallLab extends Application {
 //        BouncingBall ball = new BouncingBall(30, root.getWidth(), root.getHeight());
         BouncingBall ball = new BouncingBall.Builder()
                 .radius(30)
-                .bounds(root.getWidth(), root.getHeight() - 30)
-                .velocity(10, -15)
+                .addPane(ballPane)
+                .velocity(5, -5)
                 .mass(1)
                 .build();
 
@@ -32,13 +33,29 @@ public class BouncingBallLab extends Application {
         ball.setCenterY(root.getHeight()/2);
         ballPane.getChildren().add(ball);
 
+        BouncingBall ball2 = new BouncingBall.Builder()
+                .radius(30)
+                .addPane(ballPane)
+                .addBall(ball)
+                .velocity(3, -5)
+                .mass(1)
+                .color(Color.PURPLE)
+                .build();
+
+
+        ball.addBall(ball2);
+
+        ball2.setCenterX(root.getWidth()/2);
+        ball2.setCenterY(root.getHeight()/2);
+        ballPane.getChildren().add(ball2);
+
         root.setCenter(ballPane);
 
-        // line in getheight - 30
+        // line in getheight - 10
         Line lineGround = new Line(0, root.getHeight() -30,
-                 root.getWidth(), root.getHeight() - 30);
+                root.getWidth(), root.getHeight() - 30);
         lineGround.setStroke(Color.BLUE);
-        ballPane.getChildren().add(lineGround);
+//        ballPane.getChildren().add(lineGround);
 
         // buttons
         HBox buttonsPane = new HBox();
@@ -48,28 +65,37 @@ public class BouncingBallLab extends Application {
         Button btnPushX = new Button("Push X");
         Button btnPushY = new Button("Push Y");
 
+        // animation
+        Timeline animation = new Timeline(
+                new KeyFrame(Duration.millis(16), e -> {
+                    ball.update();
+                    ball2.update();
+                })
+        );
+        animation.setCycleCount(Timeline.INDEFINITE);
+
         btnStart.setOnAction(e -> {
-            ball.animation.play();
+            animation.play();
         });
         btnStop.setOnAction(e -> {
-            ball.animation.stop();
+            animation.stop();
         });
         btnReverse.setOnAction(e -> {
-            ball.setDx(- ball.getDx());
-            ball.setDy(- ball.getDy());
+            ball.setvX(- ball.getvX());
+            ball.setvY(- ball.getvY());
         });
         btnPushX.setOnAction(e -> {
-            ball.setDx(ball.getDx() + 10);
+            ball.setvX(ball.getvX() + 10);
         });
         btnPushY.setOnAction(e -> {
-            ball.setDy(ball.getDy() - 10);
+            ball.setvY(ball.getvY() - 10);
         });
 
         buttonsPane.getChildren().addAll(btnStart, btnStop, btnReverse, btnPushX, btnPushY);
 
         root.setBottom(buttonsPane);
 
-        stage.setResizable(false);
+//        stage.setResizable(false);
         stage.setScene(scene);
         stage.setTitle("Bouncing Ball");
         stage.show();
