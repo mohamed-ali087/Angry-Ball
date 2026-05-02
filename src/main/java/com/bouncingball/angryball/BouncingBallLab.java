@@ -88,12 +88,15 @@ public class BouncingBallLab extends Application {
         Button btnPath = new Button("Show Path");
 
         btnPath.setOnAction(e -> {
+            if (path != null){
+                path.getPoints().clear();
+            }
             path = ball.generatePathLine();
             ballPane.getChildren().add(path);
         });
 
-        ball.enableThrowingOnDrag();
-        ball2.enableThrowingOnDrag();
+        ball.enableThrowingOnDrag(true, ballPane);
+        ball2.enableThrowingOnDrag(true, ballPane);
         // animation
         Timeline animation = new Timeline(
                 new KeyFrame(Duration.millis(Physics.refreshRate), e -> {
@@ -101,6 +104,10 @@ public class BouncingBallLab extends Application {
                     ball2.easyCalc();
                     ball.update();
                     ball2.update();
+                    if(Math.abs(ball.getvX()) < 0.01 && Math.abs(ball.getvY()) < 0.01){
+//                        path.getPoints().clear();
+                        ballPane.getChildren().removeIf(node -> node instanceof Polyline);
+                    }
                 })
         );
         animation.setCycleCount(Timeline.INDEFINITE);

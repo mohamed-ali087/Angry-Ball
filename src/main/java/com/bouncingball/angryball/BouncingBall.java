@@ -270,8 +270,21 @@ public class BouncingBall extends Circle implements Physics {
         vY = p[1];
     }
 
+    public void update(){
+
+        this.setCenterX(nextX);
+        this.setCenterY(nextY);
+    }
+
+    public void easyCalc(){
+        this.applyNextPoint();
+        this.enableCollision();
+        this.applyPhysics();
+    }
+
+
     private Polyline generatePathLine(double centerX, double centerY, double vX, double vY, ArrayList<BouncingBall> ballsObserved){
-        final double PATH_LENGTH = 500;
+        final double PATH_LENGTH = 200;
         Polyline line = new Polyline();
         line.setStroke(this.getFill());
         line.getStrokeDashArray().addAll(10.0, 5.0);
@@ -366,12 +379,28 @@ public class BouncingBall extends Circle implements Physics {
             lastMouseY = e.getSceneY();
         });
     }
-    public void enableThrowingOnDrag(){
+    public void enableThrowingOnDrag(boolean drawPath, Pane pathLinePane){
 
         setOnMousePressed(e -> {
             lastMouseX = e.getSceneX();
             lastMouseY = e.getSceneY();
         });
+
+        if(drawPath){
+            setOnMouseDragged(e -> {
+                double dx = e.getSceneX() - lastMouseX;
+                double dy = e.getSceneY() - lastMouseY;
+
+                double predictedVX = vX + (-dx) * DRAGGING_FACTOR * refreshRateFactor;
+                double predictedVY = vY + (-dy) * DRAGGING_FACTOR * refreshRateFactor;
+
+                if (pathLinePane != null) {
+                    pathLinePane.getChildren().removeIf(node -> node instanceof Polyline);
+                    pathLinePane.getChildren().add(generatePathLine(getCenterX(), getCenterY(), predictedVX, predictedVY, ballsObserved));
+                }
+            });
+        }
+
         setOnMouseReleased(e -> {
             double dx = e.getSceneX() - lastMouseX;
             double dy = e.getSceneY() - lastMouseY;
@@ -379,18 +408,6 @@ public class BouncingBall extends Circle implements Physics {
             vX += (-dx) * DRAGGING_FACTOR * refreshRateFactor;
             vY += (-dy) * DRAGGING_FACTOR * refreshRateFactor;
         });
-    }
-
-    public void update(){
-
-        this.setCenterX(nextX);
-        this.setCenterY(nextY);
-    }
-
-    public void easyCalc(){
-       this.applyNextPoint();
-       this.enableCollision();
-       this.applyPhysics();
     }
 
     // Getters and Setters
