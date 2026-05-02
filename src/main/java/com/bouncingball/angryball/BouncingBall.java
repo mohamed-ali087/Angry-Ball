@@ -171,7 +171,7 @@ public class BouncingBall extends Circle {
         this.vY    = C[3];
     }
 
-    private double[] ballCollision(double nextX, double nextY, double vX, double vY){
+    private double[] ballCollision(double nextX, double nextY, double vX, double vY, boolean applyToOther){
 //        double nextX = this.nextX;
 //        double nextY = this.nextY;
 //        double vX = this.vX;
@@ -218,8 +218,11 @@ public class BouncingBall extends Circle {
                     vY  += dVA_n * ny;
 
                     // Apply velocity change to the other ball (necessary for sync) // may double effect
-                    ball.setvX(ball.getvX() + dVB_n * nx);
-                    ball.setvY(ball.getvY() + dVB_n * ny);
+                    if (applyToOther){
+                        ball.setvX(ball.getvX() + dVB_n * nx);
+                        ball.setvY(ball.getvY() + dVB_n * ny);
+                    }
+
                 }
             }
         }
@@ -228,7 +231,7 @@ public class BouncingBall extends Circle {
     }
 
     public void applyBallCollision(){
-            double[] C = ballCollision(nextX, nextY, vX, vY);
+            double[] C = ballCollision(nextX, nextY, vX, vY, true);
             this.nextX = C[0];
             this.nextY = C[1];
             this.vX    = C[2];
@@ -287,7 +290,7 @@ public class BouncingBall extends Circle {
             vX = lineCollision[2];
             vY = lineCollision[3];
 
-            double[] ballCollision = ballCollision(nextX, nextY, vX, vY);
+            double[] ballCollision = ballCollision(nextX, nextY, vX, vY, false); // this is not working correctly, because the whole line is drawn before knowing how would the other ball move
             nextX = ballCollision[0];
             nextY = ballCollision[1];
             vX = ballCollision[2];
