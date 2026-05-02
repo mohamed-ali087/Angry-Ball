@@ -1,33 +1,29 @@
 package com.bouncingball.angryball;
 
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
-import javafx.util.Duration;
 import java.util.ArrayList;
 
 public class BouncingBall extends Circle {
-    public static final double MAX_SPEED = 1000;
-    public static final double COLLISION_FACTOR = 0.7;
-    public static final double GRAVITY = 0.5;
-    private static final double X_FRICTION_FORCE = 0.05;
-    private static final double Y_FRICTION_FORCE = 0.05;
+    private static double refreshRate = 16; // animation update rate // used in other attributes for keeping speed and acceleration same independent on animation rate
+    private static double refreshRateFactor = refreshRate / 50;
+    public static final double MAX_SPEED = 1000 * refreshRateFactor;
+    public static final double COLLISION_FACTOR = 0.9;
+    public static final double GRAVITY = 0.5 * refreshRateFactor;
+    private static final double X_FRICTION_FORCE = 0.05 * refreshRateFactor;
+    private static final double Y_FRICTION_FORCE = 0.05 * refreshRateFactor;
     private double mass = 1;
-    private double vY = -10;
-    private double vX = 10;
+    private double vY = -10 * refreshRateFactor;
+    private double vX = 10 * refreshRateFactor;
     private ArrayList<Pane> boundingPanes;
     private ArrayList<Line> linesObserved;
     private ArrayList<BouncingBall> ballsObserved;
     private double nextX;
     private double nextY;
 
-
-    //    Timeline animation = new Timeline(
-//            new KeyFrame(Duration.millis(50), e -> {
-    public void update(){
+    private double[] calculateNextPoint(){
         // max speed
         if (vX > MAX_SPEED){
             vX = MAX_SPEED;
@@ -39,10 +35,23 @@ public class BouncingBall extends Circle {
         if (Math.abs(vX) < 0.01) vX = 0;
         if (Math.abs(vY) < 0.01) vY = 0;
         // next Points
-        nextX = this.getCenterX() + vX; // predicted new position
-        nextY = this.getCenterY() + vY; // predicted new position
+//        nextX = this.getCenterX() + vX; // predicted new position
+//        nextY = this.getCenterY() + vY; // predicted new position
+        return new double[] {this.getCenterX() + vX, this.getCenterY() + vY};
 
-        // ******* checking Pane Boundries Collision *********
+    }
+
+    public void applyNextPoint() {
+        double[] C = calculateNextPoint();
+        this.nextX = C[0];
+        this.nextY = C[1];
+    }
+
+    public double[] paneCollision(){
+        double nextX = this.nextX; // replace class attributes with local variables, apply later.
+        double nextY = this.nextY;
+        double vX = this.vX;
+        double vY = this.vY;
         for(Pane pane : boundingPanes){
             double boundX = pane.getWidth();
             double boundY = pane.getHeight();
@@ -78,16 +87,94 @@ public class BouncingBall extends Circle {
 
             }
         }
+        return new double[]{nextX, nextY, vX, vY};
+    }
 
-        // ************ Checking Collision for Lines *********
-        for(Line line : this.linesObserved){
+    public void applyPaneCollision(){
+        double[] C = paneCollision();
+        this.nextX = C[0];
+        this.nextY = C[1];
+        this.vX    = C[2];
+        this.vY    = C[3];
+    }
 
+    public double[] lineCollision() {
+        double nextX = this.nextX;
+        double nextY = this.nextY;
+        double vX = this.vX;
+        double vY = this.vY;
+
+        for (Line line : this.linesObserved) {
+            // AI gen
+            double x1 = line.getStartX(), y1 = line.getStartY();
+            double x2 = line.getEndX(),   y2 = line.getEndY();
+
+            // Line direction vector
+            double lx = x2 - x1;
+            double ly = y2 - y1;
+            double lineLen = Math.sqrt(lx * lx + ly * ly);
+            if (lineLen == 0) continue;
+
+            // Line unit normal (perpendicular) — pointing "up" relative to line direction
+            double nx = -ly / lineLen;
+            double ny =  lx / lineLen;
+
+            // Vector from line start to ball center
+            double bx = nextX - x1;
+            double by = nextY - y1;
+
+            // Project ball onto line direction to find closest point (clamped to segment)
+            double t = (bx * lx + by * ly) / (lineLen * lineLen);
+            t = Math.max(0, Math.min(1, t)); // clamp to [0,1] so it stays on segment
+
+            // Closest point on line segment to ball center
+            double closestX = x1 + t * lx;
+            double closestY = y1 + t * ly;
+
+            // Distance from ball center to closest point
+            double dx = nextX - closestX;
+            double dy = nextY - closestY;
+            double dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < getRadius() && dist > 0) {
+                // Use actual penetration normal (from closest point toward ball center)
+                double penNx = dx / dist;
+                double penNy = dy / dist;
+
+                // Push ball out of the line
+                double overlap = getRadius() - dist;
+                nextX += penNx * overlap;
+                nextY += penNy * overlap;
+
+                // Only bounce if ball is moving into the line
+                double vDotN = vX * penNx + vY * penNy;
+                if (vDotN < 0) {
+                    // Reflect velocity over the penetration normal
+                    vX -= (1 + COLLISION_FACTOR) * vDotN * penNx;
+                    vY -= (1 + COLLISION_FACTOR) * vDotN * penNy;
+                }
+            }
         }
 
-        // ************ Checking Collision for observed Balls *********
+        return new double[]{nextX, nextY, vX, vY};
+    }
+
+    public void applyLineCollision() {
+        double[] C = lineCollision();
+        this.nextX = C[0];
+        this.nextY = C[1];
+        this.vX    = C[2];
+        this.vY    = C[3];
+    }
+
+    public double[] ballCollision(){
+        double nextX = this.nextX;
+        double nextY = this.nextY;
+        double vX = this.vX;
+        double vY = this.vY;
         for (BouncingBall ball : this.ballsObserved) {
             double dx = ball.getCenterX() - this.getCenterX(); // Delta X between two balls centers
-            double dy = ball.nextY - this.nextY; // Delta Y between two balls centers
+            double dy = ball.nextY - nextY; // Delta Y between two balls centers
             double dist = Math.sqrt(dx * dx + dy * dy); // abs distance between two balls
             double minDist = this.getRadius() + ball.getRadius(); // minimum allowed distance
 
@@ -99,11 +186,11 @@ public class BouncingBall extends Circle {
 
                 // overlapping prevention
                 double overlap = (minDist - dist) / 2.0;
-                this.nextX -= overlap * nx;
-                this.nextY -= overlap * ny;
+                nextX -= overlap * nx;
+                nextY -= overlap * ny;
 
                 // get velocities in the normal axis of collision
-                double vA_n = this.vX * nx + this.vY * ny;
+                double vA_n = vX * nx + vY * ny;
                 double vB_n = ball.getvX() * nx + ball.getvY() * ny;
 
 
@@ -123,8 +210,8 @@ public class BouncingBall extends Circle {
                     double dVB_n = newVB_n - vB_n; // normal speed difference
 
                     // apply on X and Y velocities
-                    this.vX  += dVA_n * nx;
-                    this.vY  += dVA_n * ny;
+                    vX  += dVA_n * nx;
+                    vY  += dVA_n * ny;
 
                     // Apply velocity change to the other ball (necessary for sync) // may double effect
                     ball.setvX(ball.getvX() + dVB_n * nx);
@@ -133,7 +220,24 @@ public class BouncingBall extends Circle {
             }
         }
 
-        // Gravity and friction
+        return new double[]{nextX, nextY, vX, vY};
+    }
+
+    public void applyBallCollision(){
+            double[] C = ballCollision();
+            this.nextX = C[0];
+            this.nextY = C[1];
+            this.vX    = C[2];
+            this.vY    = C[3];
+    }
+
+    public void enableCollision(){
+        applyPaneCollision();
+        applyLineCollision();
+        applyBallCollision();
+    }
+
+    public void applyPhysics(){
         if (vY > 0){
             vY += (mass * GRAVITY - Y_FRICTION_FORCE);
         } else if (vY < 0) {
@@ -147,7 +251,19 @@ public class BouncingBall extends Circle {
         } else if (vX < 0) {
             vX += (X_FRICTION_FORCE);
         } // else if(dx == 0){}
+    }
 
+    public void update(){
+//        // ******* checking Pane Boundries Collision *********
+//        paneCollision();
+//
+//        // ************ Checking Collision for Lines *********
+//        lineCollisioin();
+//
+//        // ************ Checking Collision for observed Balls *********
+//        ballCollision();
+
+        // Gravity and friction
 
         this.setCenterX(nextX);
         this.setCenterY(nextY);
@@ -180,6 +296,10 @@ public class BouncingBall extends Circle {
 
     public void addBall(BouncingBall ball){
         this.ballsObserved.add(ball);
+    }
+
+    public void setRefreshRate(double refreshRate){
+        BouncingBall.refreshRate = refreshRate;
     }
 
 

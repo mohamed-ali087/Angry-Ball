@@ -13,6 +13,9 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 
 public class BouncingBallLab extends Application {
+
+    static final Color[] colorList = {Color.RED, Color.CORAL, Color.PURPLE, Color.GRAY, Color.GREEN, Color.YELLOWGREEN};
+
     @Override
     public void start(Stage stage) throws Exception {
         BorderPane root = new BorderPane();
@@ -68,6 +71,12 @@ public class BouncingBallLab extends Application {
         // animation
         Timeline animation = new Timeline(
                 new KeyFrame(Duration.millis(16), e -> {
+                    ball.applyNextPoint();
+                    ball2.applyNextPoint();
+                    ball.enableCollision();
+                    ball2.enableCollision();
+                    ball.applyPhysics();
+                    ball2.applyPhysics();
                     ball.update();
                     ball2.update();
                 })
