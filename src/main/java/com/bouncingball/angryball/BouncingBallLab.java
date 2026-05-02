@@ -1,3 +1,4 @@
+// this is a testing file
 package com.bouncingball.angryball;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -58,7 +59,22 @@ public class BouncingBallLab extends Application {
         Line lineGround = new Line(0, root.getHeight() -30,
                 root.getWidth(), root.getHeight() - 30);
         lineGround.setStroke(Color.BLUE);
-//        ballPane.getChildren().add(lineGround);
+        ballPane.getChildren().add(lineGround);
+        ball.addLine(lineGround);
+        ball2.addLine(lineGround);
+
+        // another line
+        Line randomLine = new Line(
+                Math.random() * scene.getWidth(),
+                Math.random() * scene.getHeight(),
+                Math.random() * scene.getWidth(),
+                Math.random() * scene.getHeight()
+        );
+        randomLine.setStroke(Color.BLUE);
+        randomLine.setStrokeWidth(2);
+        ballPane.getChildren().add(randomLine);
+        ball.addLine(randomLine);
+        ball2.addLine(randomLine);
 
         // buttons
         HBox buttonsPane = new HBox();
@@ -68,15 +84,13 @@ public class BouncingBallLab extends Application {
         Button btnPushX = new Button("Push X");
         Button btnPushY = new Button("Push Y");
 
+        ball.enableThrowingOnDrag();
+        ball2.enableThrowingOnDrag();
         // animation
         Timeline animation = new Timeline(
                 new KeyFrame(Duration.millis(16), e -> {
-                    ball.applyNextPoint();
-                    ball2.applyNextPoint();
-                    ball.enableCollision();
-                    ball2.enableCollision();
-                    ball.applyPhysics();
-                    ball2.applyPhysics();
+                    ball.easyCalc();
+                    ball2.easyCalc();
                     ball.update();
                     ball2.update();
                 })

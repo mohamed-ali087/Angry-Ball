@@ -14,6 +14,7 @@ public class BouncingBall extends Circle {
     public static final double GRAVITY = 0.5 * refreshRateFactor;
     private static final double X_FRICTION_FORCE = 0.05 * refreshRateFactor;
     private static final double Y_FRICTION_FORCE = 0.05 * refreshRateFactor;
+    private static final double DRAGGING_FACTOR = 0.4;
     private double mass = 1;
     private double vY = -10 * refreshRateFactor;
     private double vX = 10 * refreshRateFactor;
@@ -105,7 +106,7 @@ public class BouncingBall extends Circle {
         double vY = this.vY;
 
         for (Line line : this.linesObserved) {
-            // AI gen
+            // AI gen // Ball collision was painful enough
             double x1 = line.getStartX(), y1 = line.getStartY();
             double x2 = line.getEndX(),   y2 = line.getEndY();
 
@@ -253,22 +254,51 @@ public class BouncingBall extends Circle {
         } // else if(dx == 0){}
     }
 
-    public void update(){
-//        // ******* checking Pane Boundries Collision *********
-//        paneCollision();
-//
-//        // ************ Checking Collision for Lines *********
-//        lineCollisioin();
-//
-//        // ************ Checking Collision for observed Balls *********
-//        ballCollision();
+    private double lastMouseX;
+    private double lastMouseY;
+    public void enableHoldingOnDrag(){
+        setOnMousePressed(e -> {
+            lastMouseX = e.getSceneX();
+            lastMouseY = e.getSceneY();
+        });
 
-        // Gravity and friction
+        setOnMouseDragged(e -> {
+            double dx = e.getSceneX() - lastMouseX;
+            double dy = e.getSceneY() - lastMouseY;
+
+            this.vX = dx;
+            this.vY = dy;
+
+            lastMouseX = e.getSceneX();
+            lastMouseY = e.getSceneY();
+        });
+    }
+    public void enableThrowingOnDrag(){
+
+        setOnMousePressed(e -> {
+            lastMouseX = e.getSceneX();
+            lastMouseY = e.getSceneY();
+        });
+        setOnMouseReleased(e -> {
+            double dx = e.getSceneX() - lastMouseX;
+            double dy = e.getSceneY() - lastMouseY;
+
+            vX += (-dx) * DRAGGING_FACTOR * refreshRateFactor;
+            vY += (-dy) * DRAGGING_FACTOR * refreshRateFactor;
+        });
+    }
+
+    public void update(){
 
         this.setCenterX(nextX);
         this.setCenterY(nextY);
     }
 
+    public void easyCalc(){
+       this.applyNextPoint();
+       this.enableCollision();
+       this.applyPhysics();
+    }
 
     // Getters and Setters
     public double getvY() {
@@ -294,8 +324,16 @@ public class BouncingBall extends Circle {
         return this.mass;
     }
 
+    public void addPane(Pane pane){
+        this.boundingPanes.add(pane);
+    }
+
     public void addBall(BouncingBall ball){
         this.ballsObserved.add(ball);
+    }
+
+    public void addLine(Line line){
+        this.linesObserved.add(line);
     }
 
     public void setRefreshRate(double refreshRate){
@@ -315,8 +353,6 @@ public class BouncingBall extends Circle {
         this.ballsObserved = builder.ballsObserved;
         this.setCenterX(builder.centerX);
         this.setCenterY(builder.centerY);
-
-        this.setOnDragDetected(e -> {this.vX += 10;});
 
 //        animation.setCycleCount(Timeline.INDEFINITE);
 //        animation.play();
