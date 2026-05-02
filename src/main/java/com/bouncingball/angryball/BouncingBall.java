@@ -446,11 +446,6 @@ public class BouncingBall extends Circle implements Physics {
         this.linesObserved.add(line);
     }
 
-//    public void setRefreshRate(double refreshRate){
-//        BouncingBall.refreshRate = refreshRate;
-//    }
-
-
     // Using an inner Class Builder
     private BouncingBall(Builder builder) { // private Constructor
         this.setRadius(builder.radius);
