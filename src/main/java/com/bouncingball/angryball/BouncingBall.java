@@ -8,15 +8,18 @@ import javafx.scene.shape.Polyline;
 
 import java.util.ArrayList;
 
-public class BouncingBall extends Circle {
-    private static double refreshRate = 16; // animation update rate // used in other attributes for keeping speed and acceleration same independent on animation rate
-    private static double refreshRateFactor = refreshRate / 50;
-    public static final double MAX_SPEED = 1000 * refreshRateFactor;
-    public static final double COLLISION_FACTOR = 0.9;
-    public static final double GRAVITY = 0.5 * refreshRateFactor;
-    private static final double X_FRICTION_FORCE = 0.05 * refreshRateFactor;
-    private static final double Y_FRICTION_FORCE = 0.05 * refreshRateFactor;
-    private static final double DRAGGING_FACTOR = 0.4;
+interface Physics {
+     double refreshRate = 16; // animation update rate // used in other attributes for keeping speed and acceleration same independent on animation rate
+     double refreshRateFactor = refreshRate / 50;
+     double MAX_SPEED = 1000 * refreshRateFactor;
+     double COLLISION_FACTOR = 0.9;
+     double GRAVITY = 0.5 * refreshRateFactor;
+     double X_FRICTION_FORCE = 0.05 * refreshRateFactor;
+     double Y_FRICTION_FORCE = 0.05 * refreshRateFactor;
+     double DRAGGING_FACTOR = 0.4;
+}
+
+public class BouncingBall extends Circle implements Physics {
     private double mass = 1;
     private double vY = -10 * refreshRateFactor;
     private double vX = 10 * refreshRateFactor;
@@ -171,12 +174,12 @@ public class BouncingBall extends Circle {
         this.vY    = C[3];
     }
 
-    private double[] ballCollision(double nextX, double nextY, double vX, double vY, boolean applyToOther){
+    private double[] ballCollision(double nextX, double nextY, double vX, double vY, boolean applyToOther, ArrayList<BouncingBall> ballsObserved){
 //        double nextX = this.nextX;
 //        double nextY = this.nextY;
 //        double vX = this.vX;
 //        double vY = this.vY;
-        for (BouncingBall ball : this.ballsObserved) {
+        for (BouncingBall ball : ballsObserved) {
             double dx = ball.getCenterX() - this.getCenterX(); // Delta X between two balls centers
             double dy = ball.nextY - nextY; // Delta Y between two balls centers
             double dist = Math.sqrt(dx * dx + dy * dy); // abs distance between two balls
@@ -218,10 +221,10 @@ public class BouncingBall extends Circle {
                     vY  += dVA_n * ny;
 
                     // Apply velocity change to the other ball (necessary for sync) // may double effect
-                    if (applyToOther){
+//                    if (applyToOther){
                         ball.setvX(ball.getvX() + dVB_n * nx);
                         ball.setvY(ball.getvY() + dVB_n * ny);
-                    }
+//                    }
 
                 }
             }
@@ -231,7 +234,7 @@ public class BouncingBall extends Circle {
     }
 
     public void applyBallCollision(){
-            double[] C = ballCollision(nextX, nextY, vX, vY, true);
+            double[] C = ballCollision(nextX, nextY, vX, vY, true, ballsObserved);
             this.nextX = C[0];
             this.nextY = C[1];
             this.vX    = C[2];
@@ -267,50 +270,80 @@ public class BouncingBall extends Circle {
         vY = p[1];
     }
 
-    private Polyline generatePathLine(double centerX, double centerY, double vX, double vY){
-        final double PATH_LENGTH = 5000;
+    private Polyline generatePathLine(double centerX, double centerY, double vX, double vY, ArrayList<BouncingBall> ballsObserved){
+        final double PATH_LENGTH = 500;
         Polyline line = new Polyline();
         line.setStroke(this.getFill());
         line.getStrokeDashArray().addAll(10.0, 5.0);
 
+        // copy the ball array (Deep Copy)
+        ArrayList<BouncingBall> ballsObserved_copy = new ArrayList<>();
+        for (BouncingBall b : ballsObserved) {
+            BouncingBall ball = new Builder()
+                    .radius(b.getRadius())
+                    .velocity(b.getvX(), b.getvY())
+                    .mass(b.getMass())
+                    .center(b.getCenterX(), b.getCenterY())
+//                    .addBalls(b.ballsObserved) // copy by reference (issues may happen)
+                    .addPanes(b.boundingPanes)
+                    .addLines(b.linesObserved)
+                    .build();
+
+            ballsObserved_copy.add(ball);
+        }
+
+        // copy this ball
+        BouncingBall thisCopy = new Builder()
+                .radius(this.getRadius())
+                .velocity(vX, vY)
+                .mass(this.mass)
+                .center(centerX, centerY)
+                .addPanes(this.boundingPanes) // they are static no problem with copying by reference for now
+                .addLines(this.linesObserved)
+                .build();
+
+        // adding the ball to virtual balls and the virtual balls to the ball
+        for (BouncingBall ball : ballsObserved_copy) {
+            thisCopy.addBall(ball);   // thisCopy sees the copies
+            ball.addBall(thisCopy);   // each copy sees thisCopy
+        }
+
+        // adding virtual balls to each other
+        for (int i = 0; i < ballsObserved_copy.size(); i++) {
+            for (int j = 0; j < ballsObserved_copy.size(); j++) {
+                if (i != j) ballsObserved_copy.get(i).addBall(ballsObserved_copy.get(j));
+            }
+        }
+
         for (int i = 0; i < PATH_LENGTH; i++) {
-            double[] nextPoint = calculateNextPoint(centerX, centerY, vX, vY);
-            double nextX = nextPoint[0];
-            double nextY = nextPoint[1];
+            thisCopy.applyNextPoint();
+            thisCopy.applyPaneCollision();
+            thisCopy.applyLineCollision();
+            thisCopy.applyBallCollision();
+            thisCopy.applyPhysics();
 
-            double[] paneCollision = paneCollision(nextX, nextY, vX, vY);
-            nextX = paneCollision[0];
-            nextY = paneCollision[1];
-            vX = paneCollision[2];
-            vY = paneCollision[3];
+            // update other balls
+            for(BouncingBall ball : ballsObserved_copy){
+                ball.applyNextPoint();
+                ball.applyPhysics();
+                ball.applyLineCollision();
+                ball.applyPaneCollision();
+                ball.applyBallCollision();
+            }
+            for(BouncingBall ball : ballsObserved_copy){
+                ball.update();
+            }
 
-            double[] lineCollision = lineCollision(nextX, nextY, vX, vY);
-            nextX = lineCollision[0];
-            nextY = lineCollision[1];
-            vX = lineCollision[2];
-            vY = lineCollision[3];
+            // update this ball
+            thisCopy.update();
 
-            double[] ballCollision = ballCollision(nextX, nextY, vX, vY, false); // this is not working correctly, because the whole line is drawn before knowing how would the other ball move
-            nextX = ballCollision[0];
-            nextY = ballCollision[1];
-            vX = ballCollision[2];
-            vY = ballCollision[3];
-
-            double[] physics = physics(vX, vY);
-            vX = physics[0];
-            vY = physics[1];
-
-            centerX = nextX;
-            centerY = nextY;
-
-
-            line.getPoints().addAll(centerX, centerY);
+            line.getPoints().addAll(thisCopy.getCenterX(), thisCopy.getCenterY());
         }
 
         return line;
     }
     public Polyline generatePathLine(){ // overloading
-        return generatePathLine(getCenterX(), getCenterY(), vX, vY);
+        return generatePathLine(getCenterX(), getCenterY(), vX, vY, ballsObserved);
     }
 
 
@@ -396,9 +429,9 @@ public class BouncingBall extends Circle {
         this.linesObserved.add(line);
     }
 
-    public void setRefreshRate(double refreshRate){
-        BouncingBall.refreshRate = refreshRate;
-    }
+//    public void setRefreshRate(double refreshRate){
+//        BouncingBall.refreshRate = refreshRate;
+//    }
 
 
     // Using an inner Class Builder

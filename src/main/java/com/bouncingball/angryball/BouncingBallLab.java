@@ -96,7 +96,7 @@ public class BouncingBallLab extends Application {
         ball2.enableThrowingOnDrag();
         // animation
         Timeline animation = new Timeline(
-                new KeyFrame(Duration.millis(16), e -> {
+                new KeyFrame(Duration.millis(Physics.refreshRate), e -> {
                     ball.easyCalc();
                     ball2.easyCalc();
                     ball.update();
