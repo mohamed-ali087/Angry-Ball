@@ -14,4 +14,6 @@ A JavaFX physics simulation featuring bouncing balls with realistic collision de
 - **Observer Pattern** - objects can see each other using observer lists.
 
 ## Demo
-![demo](Demos/DemoV1.mp4)
+![demo](https://github.com/user-attachments/assets/04961c0f-29b1-4e44-b20d-99e2f17d5b48)
+
+
