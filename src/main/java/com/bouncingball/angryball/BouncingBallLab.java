@@ -10,12 +10,14 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
+import javafx.scene.shape.Polyline;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
 public class BouncingBallLab extends Application {
 
-    static final Color[] colorList = {Color.RED, Color.CORAL, Color.PURPLE, Color.GRAY, Color.GREEN, Color.YELLOWGREEN};
+    static final Color[] colorList = {Color.RED, Color.CORAL, Color.PURPLE, Color.GRAY, Color.GREEN, Color.YELLOWGREEN, Color.PINK, Color.DARKBLUE, Color.DARKCYAN, Color.DARKGOLDENROD};
+    Polyline path;
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -83,6 +85,12 @@ public class BouncingBallLab extends Application {
         Button btnReverse = new Button("reverse");
         Button btnPushX = new Button("Push X");
         Button btnPushY = new Button("Push Y");
+        Button btnPath = new Button("Show Path");
+
+        btnPath.setOnAction(e -> {
+            path = ball.generatePathLine();
+            ballPane.getChildren().add(path);
+        });
 
         ball.enableThrowingOnDrag();
         ball2.enableThrowingOnDrag();
@@ -114,7 +122,7 @@ public class BouncingBallLab extends Application {
             ball.setvY(ball.getvY() - 10);
         });
 
-        buttonsPane.getChildren().addAll(btnStart, btnStop, btnReverse, btnPushX, btnPushY);
+        buttonsPane.getChildren().addAll(btnStart, btnStop, btnReverse, btnPushX, btnPushY, btnPath);
 
         root.setBottom(buttonsPane);
 

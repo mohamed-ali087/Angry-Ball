@@ -4,6 +4,8 @@ import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
+import javafx.scene.shape.Polyline;
+
 import java.util.ArrayList;
 
 public class BouncingBall extends Circle {
@@ -24,7 +26,7 @@ public class BouncingBall extends Circle {
     private double nextX;
     private double nextY;
 
-    private double[] calculateNextPoint(){
+    private double[] calculateNextPoint(double CenterX, double CenterY, double vX, double vY){
         // max speed
         if (vX > MAX_SPEED){
             vX = MAX_SPEED;
@@ -38,21 +40,22 @@ public class BouncingBall extends Circle {
         // next Points
 //        nextX = this.getCenterX() + vX; // predicted new position
 //        nextY = this.getCenterY() + vY; // predicted new position
-        return new double[] {this.getCenterX() + vX, this.getCenterY() + vY};
+        return new double[] {CenterX + vX, CenterY + vY};
 
     }
 
     public void applyNextPoint() {
-        double[] C = calculateNextPoint();
+        double[] C = calculateNextPoint(getCenterX(), getCenterY(), vX, vY);
         this.nextX = C[0];
         this.nextY = C[1];
     }
 
-    public double[] paneCollision(){
-        double nextX = this.nextX; // replace class attributes with local variables, apply later.
-        double nextY = this.nextY;
-        double vX = this.vX;
-        double vY = this.vY;
+    private double[] paneCollision(double nextX, double nextY, double vX, double vY){
+//        double nextX = this.nextX; // replace class attributes with local variables, apply later.
+//        double nextY = this.nextY;
+//        double vX = this.vX;
+//        double vY = this.vY;
+
         for(Pane pane : boundingPanes){
             double boundX = pane.getWidth();
             double boundY = pane.getHeight();
@@ -92,18 +95,18 @@ public class BouncingBall extends Circle {
     }
 
     public void applyPaneCollision(){
-        double[] C = paneCollision();
+        double[] C = paneCollision(nextX, nextY, vX, vY);
         this.nextX = C[0];
         this.nextY = C[1];
         this.vX    = C[2];
         this.vY    = C[3];
     }
 
-    public double[] lineCollision() {
-        double nextX = this.nextX;
-        double nextY = this.nextY;
-        double vX = this.vX;
-        double vY = this.vY;
+    private double[] lineCollision(double nextX, double nextY, double vX, double vY) {
+//        double nextX = this.nextX;
+//        double nextY = this.nextY;
+//        double vX = this.vX;
+//        double vY = this.vY;
 
         for (Line line : this.linesObserved) {
             // AI gen // Ball collision was painful enough
@@ -161,18 +164,18 @@ public class BouncingBall extends Circle {
     }
 
     public void applyLineCollision() {
-        double[] C = lineCollision();
+        double[] C = lineCollision(nextX, nextY, vX, vY);
         this.nextX = C[0];
         this.nextY = C[1];
         this.vX    = C[2];
         this.vY    = C[3];
     }
 
-    public double[] ballCollision(){
-        double nextX = this.nextX;
-        double nextY = this.nextY;
-        double vX = this.vX;
-        double vY = this.vY;
+    private double[] ballCollision(double nextX, double nextY, double vX, double vY){
+//        double nextX = this.nextX;
+//        double nextY = this.nextY;
+//        double vX = this.vX;
+//        double vY = this.vY;
         for (BouncingBall ball : this.ballsObserved) {
             double dx = ball.getCenterX() - this.getCenterX(); // Delta X between two balls centers
             double dy = ball.nextY - nextY; // Delta Y between two balls centers
@@ -225,7 +228,7 @@ public class BouncingBall extends Circle {
     }
 
     public void applyBallCollision(){
-            double[] C = ballCollision();
+            double[] C = ballCollision(nextX, nextY, vX, vY);
             this.nextX = C[0];
             this.nextY = C[1];
             this.vX    = C[2];
@@ -238,7 +241,7 @@ public class BouncingBall extends Circle {
         applyBallCollision();
     }
 
-    public void applyPhysics(){
+    public double[] physics(double vX, double vY){
         if (vY > 0){
             vY += (mass * GRAVITY - Y_FRICTION_FORCE);
         } else if (vY < 0) {
@@ -252,7 +255,61 @@ public class BouncingBall extends Circle {
         } else if (vX < 0) {
             vX += (X_FRICTION_FORCE);
         } // else if(dx == 0){}
+        return new double[] {vX, vY};
     }
+
+    public void applyPhysics(){
+        double[] p = physics(vX, vY);
+        vX = p[0];
+        vY = p[1];
+    }
+
+    private Polyline generatePathLine(double centerX, double centerY, double vX, double vY){
+        final double PATH_LENGTH = 5000;
+        Polyline line = new Polyline();
+        line.setStroke(this.getFill());
+        line.getStrokeDashArray().addAll(10.0, 5.0);
+
+        for (int i = 0; i < PATH_LENGTH; i++) {
+            double[] nextPoint = calculateNextPoint(centerX, centerY, vX, vY);
+            double nextX = nextPoint[0];
+            double nextY = nextPoint[1];
+
+            double[] paneCollision = paneCollision(nextX, nextY, vX, vY);
+            nextX = paneCollision[0];
+            nextY = paneCollision[1];
+            vX = paneCollision[2];
+            vY = paneCollision[3];
+
+            double[] lineCollision = lineCollision(nextX, nextY, vX, vY);
+            nextX = lineCollision[0];
+            nextY = lineCollision[1];
+            vX = lineCollision[2];
+            vY = lineCollision[3];
+
+            double[] ballCollision = ballCollision(nextX, nextY, vX, vY);
+            nextX = ballCollision[0];
+            nextY = ballCollision[1];
+            vX = ballCollision[2];
+            vY = ballCollision[3];
+
+            double[] physics = physics(vX, vY);
+            vX = physics[0];
+            vY = physics[1];
+
+            centerX = nextX;
+            centerY = nextY;
+
+
+            line.getPoints().addAll(centerX, centerY);
+        }
+
+        return line;
+    }
+    public Polyline generatePathLine(){ // overloading
+        return generatePathLine(getCenterX(), getCenterY(), vX, vY);
+    }
+
 
     private double lastMouseX;
     private double lastMouseY;
